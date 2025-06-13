@@ -30,14 +30,22 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
-    private func saveApiKey() {
+    func saveApiKey() {
         iCloudStorageManager.shared.saveApiKey(apiKey)
+    }
+
+    func deleteApiKey() {
+        iCloudStorageManager.shared.saveApiKey("")
+        DispatchQueue.main.async {
+            self.apiKey = ""
+        }
     }
 }
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
-
+    @Environment(\.dismiss) private var dismiss
+    
     var body: some View {
         NavigationView {
             Form {
@@ -46,9 +54,21 @@ struct SettingsView: View {
                         .textContentType(.password)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
+
+                    Button("Delete") {
+                        viewModel.deleteApiKey()
+                    }
+                    .foregroundColor(.red)
                 }
             }
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }

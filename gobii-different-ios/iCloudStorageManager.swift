@@ -38,7 +38,7 @@ final class iCloudStorageManager {
 
     // MARK: - Tasks
 
-    func saveTasks(_ tasks: [Task]) {
+    func saveTasks(_ tasks: [AppTask]) {
         do {
             let data = try JSONEncoder().encode(tasks)
             store.set(data, forKey: "tasks")
@@ -48,12 +48,12 @@ final class iCloudStorageManager {
         }
     }
 
-    func loadTasks() -> [Task] {
+    func loadTasks() -> [AppTask] {
         guard let data = store.data(forKey: "tasks") else {
             return []
         }
         do {
-            let tasks = try JSONDecoder().decode([Task].self, from: data)
+            let tasks = try JSONDecoder().decode([AppTask].self, from: data)
             return tasks
         } catch {
             print("Failed to decode tasks from iCloud storage: \(error)")

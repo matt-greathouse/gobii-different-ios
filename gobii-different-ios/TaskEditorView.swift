@@ -2,11 +2,11 @@ import SwiftUI
 
 // ViewModel for TaskEditorView
 class TaskEditorViewModel: ObservableObject {
-    @Published var task: Task
+    @Published var task: AppTask
 
     private let storageManager = iCloudStorageManager.shared
 
-    init(task: Task) {
+    init(task: AppTask) {
         self.task = task
     }
 
@@ -169,12 +169,12 @@ struct TaskEditorView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject var viewModel: TaskEditorViewModel
 
-    init(task: Task, onSave: @escaping (Task) -> Void) {
+    init(task: AppTask, onSave: @escaping (AppTask) -> Void) {
         _viewModel = StateObject(wrappedValue: TaskEditorViewModel(task: task))
         self.onSave = onSave
     }
 
-    var onSave: (Task) -> Void
+    var onSave: (AppTask) -> Void
 
     var body: some View {
         NavigationView {
@@ -212,6 +212,6 @@ struct TaskEditorView: View {
 // Preview
 struct TaskEditorView_Previews: PreviewProvider {
     static var previews: some View {
-        TaskEditorView(task: Task()) { _ in }
+        TaskEditorView(task: AppTask()) { _ in }
     }
 }

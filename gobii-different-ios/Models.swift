@@ -70,7 +70,7 @@ indirect enum OutputSchema: Codable {
 }
 
 // Struct representing a task
-struct Task: Codable, Identifiable, Hashable {
+struct AppTask: Codable, Identifiable, Hashable {
     var id: UUID
     var name: String
     var prompt: String
@@ -88,7 +88,7 @@ struct Task: Codable, Identifiable, Hashable {
         hasher.combine(id)
     }
     
-    static func == (lhs: Task, rhs: Task) -> Bool {
+    static func == (lhs: AppTask, rhs: AppTask) -> Bool {
         return lhs.id == rhs.id
     }
 }
