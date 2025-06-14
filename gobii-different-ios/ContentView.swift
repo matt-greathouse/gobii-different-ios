@@ -8,21 +8,19 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var showingSettings = false
-
     var body: some View {
-        NavigationView {
-            VStack {
+        TabView {
+            NavigationView {
                 TaskListView()
             }
-            .padding()
-            .navigationBarItems(leading: Button(action: {
-                showingSettings = true
-            }) {
-                Image(systemName: "gearshape")
-            })
-            .sheet(isPresented: $showingSettings) {
+            .tabItem {
+                Label("Tasks", systemImage: "checkmark.circle")
+            }
+            NavigationView {
                 SettingsView()
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
             }
         }
     }

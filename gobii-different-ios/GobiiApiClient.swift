@@ -58,6 +58,14 @@ class GobiiApiClient {
         } catch {
             throw GobiiApiError.decodingError(error)
         }
+        // Debugging - Print Request
+        if let body = request.httpBody, let json = String(data: body, encoding: .utf8) {
+            print("=== API REQUEST ===")
+            print("URL: \(request.url?.absoluteString ?? "<none>")")
+            print("Headers: \(request.allHTTPHeaderFields ?? [:])")
+            print("Body: \(json)")
+            print("===================")
+        }
 
         // Send request
         do {
@@ -66,6 +74,13 @@ class GobiiApiClient {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw GobiiApiError.invalidResponse
             }
+            
+            // Debugging - Print Response
+            let responseText = String(data: data, encoding: .utf8) ?? "<unreadable data>"
+            print("=== API RESPONSE ===")
+            print("Status: \(httpResponse.statusCode)")
+            print("Body: \(responseText)")
+            print("====================")
 
             guard (200...299).contains(httpResponse.statusCode) else {
                 throw GobiiApiError.serverError(statusCode: httpResponse.statusCode)

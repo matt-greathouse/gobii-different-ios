@@ -7,6 +7,7 @@ indirect enum OutputSchema: Codable {
     case boolean
     case object(properties: [String: OutputSchema])
     case array(items: OutputSchema)
+    case null
 
     // Codable conformance
     enum CodingKeys: String, CodingKey {
@@ -21,6 +22,7 @@ indirect enum OutputSchema: Codable {
         case boolean
         case object
         case array
+        case null
     }
 
     init(from decoder: Decoder) throws {
@@ -39,6 +41,8 @@ indirect enum OutputSchema: Codable {
         case .array:
             let items = try container.decode(OutputSchema.self, forKey: .items)
             self = .array(items: items)
+        case .null:
+            self = .null
         }
     }
 
@@ -57,15 +61,9 @@ indirect enum OutputSchema: Codable {
         case .array(let items):
             try container.encode(OutputType.array, forKey: .type)
             try container.encode(items, forKey: .items)
+        case .null:
+            try container.encode(OutputType.null, forKey: .type)
         }
-    }
-
-    // Sample default value for UI development
-    static var sample: OutputSchema {
-        return .object(properties: [
-            "name": .string,
-            "value": .number
-        ])
     }
 }
 
@@ -74,9 +72,9 @@ struct AppTask: Codable, Identifiable, Hashable {
     var id: UUID
     var name: String
     var prompt: String
-    var outputSchema: OutputSchema
+    var outputSchema: OutputSchema?
 
-    init(id: UUID = UUID(), name: String = "", prompt: String = "", outputSchema: OutputSchema = OutputSchema.sample) {
+    init(id: UUID = UUID(), name: String = "", prompt: String = "", outputSchema: OutputSchema? = nil) {
         self.id = id
         self.name = name
         self.prompt = prompt

@@ -11,6 +11,11 @@ class TaskEditorViewModel: ObservableObject {
     }
 
     func save() {
+        // If output schema is effectively empty, set it to nil
+        if case .object(let properties) = task.outputSchema, properties.isEmpty {
+            task.outputSchema = nil
+        }
+
         // Load existing tasks
         var tasks = storageManager.loadTasks()
 
@@ -28,7 +33,7 @@ class TaskEditorViewModel: ObservableObject {
 
 // View for editing the OutputSchema recursively
 struct OutputSchemaEditorView: View {
-    @Binding var schema: OutputSchema
+    @Binding var schema: OutputSchema?
     @State private var newFieldName: String = ""
 
     var body: some View {
@@ -43,30 +48,36 @@ struct OutputSchemaEditorView: View {
             let keys = Array(properties.keys.sorted())
             VStack(alignment: .leading) {
                 List {
-                    ForEach(keys, id: \String.self) { key in
+                    ForEach(keys, id: \.self) { key in
                         if let value = properties[key] {
                             PropertyRow(key: key, value: value, onUpdate: { newValue in
                                 var updatedProperties = properties
                                 updatedProperties[key] = newValue
                                 schema = .object(properties: updatedProperties)
-                            }, onRemove: {
-                                var updatedProperties = properties
-                                updatedProperties.removeValue(forKey: key)
-                                schema = .object(properties: updatedProperties)
-                            })
+                            }, onRemove: {})
                         }
+                    }
+                    .onDelete { indexSet in
+                        var updatedProperties = properties
+                        for index in indexSet {
+                            let keyToRemove = keys[index]
+                            updatedProperties.removeValue(forKey: keyToRemove)
+                        }
+                        schema = .object(properties: updatedProperties)
                     }
                 }
                 HStack {
                     TextField("New Field Name", text: $newFieldName)
                     OutputSchemaPicker(schema: .constant(.string))
                         .frame(width: 100)
-                    Button("Add") {
+                    Button(action: {
                         guard !newFieldName.isEmpty else { return }
                         var updatedProperties = properties
                         updatedProperties[newFieldName] = .string
                         schema = .object(properties: updatedProperties)
                         newFieldName = ""
+                    }) {
+                        Image(systemName: "plus")
                     }
                 }
                 .padding(.horizontal)
@@ -77,8 +88,18 @@ struct OutputSchemaEditorView: View {
                 OutputSchemaEditorView(schema: Binding(
                     get: { items },
                     set: { newSchema in
-                        schema = .array(items: newSchema)
+                        if let unwrapped = newSchema {
+                            schema = .array(items: unwrapped)
+                        }
                     }))
+            }
+        case .none:
+            VStack {
+                Text("No Schema Specified")
+            }
+        case .null:
+            VStack {
+                Text("No Schema Specified")
             }
         }
     }
@@ -101,24 +122,22 @@ struct PropertyRow: View {
                     set: { newValue in
                         onUpdate(newValue)
                     }))
-                Button(action: {
-                    onRemove()
-                }) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.red)
-                }
             }
             if case .object = value {
                 OutputSchemaEditorView(schema: Binding(
                     get: { value },
                     set: { newValue in
-                        onUpdate(newValue)
+                        if let unwrapped = newValue {
+                            onUpdate(unwrapped)
+                        }
                     }))
             } else if case .array = value {
                 OutputSchemaEditorView(schema: Binding(
                     get: { value },
                     set: { newValue in
-                        onUpdate(newValue)
+                        if let unwrapped = newValue {
+                            onUpdate(unwrapped)
+                        }
                     }))
             }
         }
@@ -139,6 +158,7 @@ struct OutputSchemaPicker: View {
                 case .boolean: return OutputSchema.OutputType.boolean
                 case .object: return OutputSchema.OutputType.object
                 case .array: return OutputSchema.OutputType.array
+                case .null: return OutputSchema.OutputType.null
                 }
             },
             set: { newType in
@@ -153,6 +173,8 @@ struct OutputSchemaPicker: View {
                     schema = .object(properties: [:])
                 case .array:
                     schema = .array(items: .string)
+                case .null:
+                    schema = .null
                 }
             })) {
             Text("Number").tag(OutputSchema.OutputType.number)

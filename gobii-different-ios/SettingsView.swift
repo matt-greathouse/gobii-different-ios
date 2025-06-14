@@ -44,7 +44,6 @@ final class SettingsViewModel: ObservableObject {
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
-    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationView {
@@ -62,13 +61,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }

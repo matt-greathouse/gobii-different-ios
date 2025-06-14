@@ -43,41 +43,55 @@ class TaskListViewModel: ObservableObject {
 }
 
 struct TaskListView: View {
-    @StateObject private var viewModel = TaskListViewModel()
+    @StateObject private var viewModel: TaskListViewModel
     @State private var showingNewTaskEditor = false
     @State private var selectedTask: AppTask? = nil
 
     // New states for alert presentation
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    
+    init(viewModel: TaskListViewModel = TaskListViewModel()) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(viewModel.tasks) { task in
-                    HStack {
-                        NavigationLink(value: task) {
-                            Text(task.name)
-                        }
-                        Spacer()
-                        Button(action: {
-                            Task {
-                                do {
-                                    let response = try await GobiiApiClient.shared.runTask(task)
-                                    // Assuming response has id and name fields
-                                    alertMessage = "Task run successful: \nName: \(response.name)\nID: \(response.id)"
-                                } catch {
-                                    alertMessage = "Failed to run task: \(error.localizedDescription)"
-                                }
-                                showingAlert = true
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(viewModel.tasks) { task in
+                        VStack(alignment: .leading, spacing: 8) {
+                            NavigationLink(value: task) {
+                                Text(task.name)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                    .padding(.bottom, 4)
                             }
-                        }) {
-                            Text("Run")
-                                .foregroundColor(.blue)
+                            .onTapGesture {
+                                selectedTask = task
+                            }
+                            Button(action: {
+                                Task {
+                                    do {
+                                        let response = try await GobiiApiClient.shared.runTask(task)
+                                        alertMessage = "Task run successful: \nName: \(response.name)\nID: \(response.id)"
+                                    } catch {
+                                        alertMessage = "Failed to run task: \(error.localizedDescription)"
+                                    }
+                                    showingAlert = true
+                                }
+                            }) {
+                                Image(systemName: "play.fill")
+                                    .padding()
+                                    .background(Circle().fill(Color.blue.opacity(0.1)))
+                            }
                         }
-                        .buttonStyle(BorderlessButtonStyle())
+                        .padding()
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
+                        .shadow(radius: 2)
                     }
                 }
+                .padding()
             }
             .navigationTitle("Tasks")
             .navigationDestination(for: AppTask.self) { task in
@@ -100,7 +114,7 @@ struct TaskListView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        let newTask = AppTask(name: "New Task", prompt: "", outputSchema: .sample)
+                        let newTask = AppTask(name: "New Task", prompt: "", outputSchema: nil)
                         selectedTask = newTask
                         showingNewTaskEditor = true
                     }) {
@@ -120,6 +134,12 @@ struct TaskListView: View {
 // Preview
 struct TaskListView_Previews: PreviewProvider {
     static var previews: some View {
-        TaskListView()
+        let mockViewModel = TaskListViewModel();
+        mockViewModel.tasks = [
+            AppTask(id: UUID(), name: "Sample Task 1", prompt: "Sample Prompt", outputSchema: nil),
+            AppTask(id: UUID(), name: "Sample Task 2", prompt: "Sample Prompt", outputSchema: nil),
+            AppTask(id: UUID(), name: "Sample Task 3", prompt: "Sample Prompt", outputSchema: nil)
+        ]
+        return TaskListView(viewModel: mockViewModel)
     }
 }
