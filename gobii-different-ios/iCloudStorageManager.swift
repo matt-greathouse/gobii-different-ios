@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import gobii_client_swift
 
 final class iCloudStorageManager {
     static let shared = iCloudStorageManager()
@@ -38,7 +39,7 @@ final class iCloudStorageManager {
 
     // MARK: - Tasks
 
-    func saveTasks(_ tasks: [AppTask]) {
+    func saveTasks(_ tasks: [GobiiTask]) {
         do {
             let data = try JSONEncoder().encode(tasks)
             store.set(data, forKey: "tasks")
@@ -48,12 +49,12 @@ final class iCloudStorageManager {
         }
     }
 
-    func loadTasks() -> [AppTask] {
+    func loadTasks() -> [GobiiTask] {
         guard let data = store.data(forKey: "tasks") else {
             return []
         }
         do {
-            let tasks = try JSONDecoder().decode([AppTask].self, from: data)
+            let tasks = try JSONDecoder().decode([GobiiTask].self, from: data)
             return tasks
         } catch {
             print("Failed to decode tasks from iCloud storage: \(error)")

@@ -1,12 +1,14 @@
 import SwiftUI
 import Combine
+import gobii_client_swift
 
 // Import app modules or files
 
 
 // ViewModel for TaskListView
+@MainActor
 class TaskListViewModel: ObservableObject {
-    @Published var tasks: [AppTask] = []
+    @Published var tasks: [GobiiTask] = []
 
     private let storageManager = iCloudStorageManager.shared
     private var cancellables = Set<AnyCancellable>()
@@ -29,101 +31,159 @@ class TaskListViewModel: ObservableObject {
         storageManager.saveTasks(tasks)
     }
 
-    func addTask(_ task: AppTask) {
+    func addTask(_ task: GobiiTask) {
         tasks.append(task)
         saveTasks()
     }
 
-    func updateTask(_ task: AppTask) {
+    func updateTask(_ task: GobiiTask) {
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index] = task
             saveTasks()
         }
     }
+
+    /// Runs the given task asynchronously, updating running state and polling status.
+    func runTask(_ task: GobiiTask) async {
+        do {
+            guard let apiKey = iCloudStorageManager.shared.loadApiKey(), !apiKey.isEmpty else {
+                print("missing api key")
+                return
+            }
+            
+            let client = GobiiApiClient(debugMode: true)
+            client.setApiKey(apiKey)
+            // Start running the task
+            let runResult = try await client.runTask(task.detail)
+
+            var currentResult = task
+
+            if let index = self.tasks.firstIndex(where: { $0.id == task.id }) {
+                self.tasks[index].id = runResult.id ?? ""
+                self.saveTasks()
+                currentResult.id = runResult.id ?? ""
+            }
+            
+            // Poll for status updates every 5 seconds until completed
+            while true {
+                // Wait 5 seconds
+                try await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+
+                // Fetch updated task status
+                let updatedTask = try await client.fetchTaskStatus(id: currentResult.id)
+
+                // Update lastResult in local task
+                currentResult.detail = updatedTask
+
+                // Update task in tasks list
+                DispatchQueue.main.async {
+                    if let index = self.tasks.firstIndex(where: { $0.id == currentResult.id }) {
+                        self.tasks[index].lastResult = currentResult.lastResult
+                        self.saveTasks()
+                    }
+                }
+
+                // Check if task is done (based on lastResult or a hypothetical isRunning flag)
+                // Here we assume lastResult contains status info or empty means running
+                if let status = updatedTask.status, status.rawValue.lowercased().contains("completed") {
+                    currentResult.lastResult = updatedTask.result ?? ""
+                    break
+                }
+            }
+
+        } catch {
+            // Notify UI or log error - this example does not have error UI in ViewModel
+            print("Error running task: \(error)")
+        }
+    }
+}
+
+struct TaskRowView: View {
+    let task: GobiiTask
+    let onRun: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text(task.name)
+                    .font(.headline)
+                Spacer()
+                if task.detail.status == StatusEnum.in_progress {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                } else {
+                    Button(action: onRun) {
+                        Image(systemName: "play.fill")
+                            .padding(6)
+                            .background(Circle().fill(Color.blue.opacity(0.1)))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            if let lastResult = Optional(task.lastResult), !lastResult.isEmpty {
+                Text(lastResult)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
 }
 
 struct TaskListView: View {
-    @StateObject private var viewModel: TaskListViewModel
+    @StateObject private var viewModel: TaskListViewModel = TaskListViewModel();
     @State private var showingNewTaskEditor = false
-    @State private var selectedTask: AppTask? = nil
-
-    // New states for alert presentation
-    @State private var showingAlert = false
-    @State private var alertMessage = ""
+    @State private var selectedTask: GobiiTask? = nil
     
-    init(viewModel: TaskListViewModel = TaskListViewModel()) {
-        _viewModel = StateObject(wrappedValue: viewModel)
+    init(viewModel: TaskListViewModel? = nil) {
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        }
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(viewModel.tasks) { task in
-                        VStack(alignment: .leading, spacing: 8) {
-                            NavigationLink(value: task) {
-                                Text(task.name)
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                    .padding(.bottom, 4)
-                            }
-                            .onTapGesture {
-                                selectedTask = task
-                            }
-                            Button(action: {
+        NavigationView {
+            List {
+                ForEach(viewModel.tasks) { task in
+                    Button(action: {
+                        selectedTask = task
+                    }) {
+                        TaskRowView(
+                            task: task,
+                            onRun: {
                                 Task {
-                                    do {
-                                        let response = try await GobiiApiClient.shared.runTask(task)
-                                        alertMessage = "Task run successful: \nName: \(response.name)\nID: \(response.id)"
-                                    } catch {
-                                        alertMessage = "Failed to run task: \(error.localizedDescription)"
-                                    }
-                                    showingAlert = true
+                                    await viewModel.runTask(task)
                                 }
-                            }) {
-                                Image(systemName: "play.fill")
-                                    .padding()
-                                    .background(Circle().fill(Color.blue.opacity(0.1)))
                             }
+                        )
+                    }
+                    .sheet(item: $selectedTask) { task in
+                        TaskEditorView(task: task) { updatedTask in
+                            viewModel.updateTask(updatedTask)
+                            selectedTask = nil
                         }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
-                        .shadow(radius: 2)
                     }
                 }
-                .padding()
+                .onDelete { indexSet in
+                    viewModel.tasks.remove(atOffsets: indexSet)
+                    viewModel.saveTasks()
+                }
             }
             .navigationTitle("Tasks")
-            .navigationDestination(for: AppTask.self) { task in
-                TaskEditorView(task: task) { updatedTask in
-                    viewModel.updateTask(updatedTask)
-                }
-            }
-            .navigationDestination(isPresented: $showingNewTaskEditor) {
-                if let newTask = selectedTask {
-                    TaskEditorView(task: newTask) { updatedTask in
-                        if !viewModel.tasks.contains(where: { $0.id == updatedTask.id }) {
-                            viewModel.addTask(updatedTask)
-                        } else {
-                            viewModel.updateTask(updatedTask)
-                        }
-                        selectedTask = nil
-                    }
-                }
-            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        let newTask = AppTask(name: "New Task", prompt: "", outputSchema: nil)
-                        selectedTask = newTask
                         showingNewTaskEditor = true
                     }) {
                         Image(systemName: "plus")
                     }
                 }
             }
-            .alert(isPresented: $showingAlert) {
-                Alert(title: Text("Run Task"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+            .sheet(isPresented: $showingNewTaskEditor) {
+                TaskEditorView(task: GobiiTask(name: "", detail: TaskDetail(id: UUID().uuidString)), onSave: { newTask in
+                    viewModel.addTask(newTask)
+                    showingNewTaskEditor = false
+                })
             }
         }
     }
@@ -136,9 +196,9 @@ struct TaskListView_Previews: PreviewProvider {
     static var previews: some View {
         let mockViewModel = TaskListViewModel();
         mockViewModel.tasks = [
-            AppTask(id: UUID(), name: "Sample Task 1", prompt: "Sample Prompt", outputSchema: nil),
-            AppTask(id: UUID(), name: "Sample Task 2", prompt: "Sample Prompt", outputSchema: nil),
-            AppTask(id: UUID(), name: "Sample Task 3", prompt: "Sample Prompt", outputSchema: nil)
+            GobiiTask(name: "Sample Task 1", detail: TaskDetail(id: UUID().uuidString, prompt: "Sample Prompt", outputSchema: nil)),
+            GobiiTask(name: "Sample Task 2", detail: TaskDetail(id: UUID().uuidString, prompt: "Sample Prompt", outputSchema: nil)),
+            GobiiTask(name: "Sample Task 3", detail: TaskDetail(id: UUID().uuidString, prompt: "Sample Prompt", outputSchema: nil)),
         ]
         return TaskListView(viewModel: mockViewModel)
     }

@@ -1,0 +1,15 @@
+{
+  "originHash" : "5b468b8f4abe87c03f91b2e01dcb88d328ca2a3766a6594b4dc68cb748a21df9",
+  "pins" : [
+    {
+      "identity" : "gobii-api-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/matt-greathouse/gobii-api-swift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "8a64d6b6545efc0218f37883f285f8575f038313"
+      }
+    }
+  ],
+  "version" : 3
+}

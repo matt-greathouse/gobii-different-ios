@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		622009D52E0238D100DF2F3F /* gobii-client-swift in Frameworks */ = {isa = PBXBuildFile; productRef = 622009D42E0238D100DF2F3F /* gobii-client-swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		62B2E9182DFBA1E800B9A87B /* gobii-different-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "gobii-different-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				622009D52E0238D100DF2F3F /* gobii-client-swift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = "gobii-different-ios";
 			packageProductDependencies = (
+				622009D42E0238D100DF2F3F /* gobii-client-swift */,
 			);
 			productName = "gobii-different-ios";
 			productReference = 62B2E9182DFBA1E800B9A87B /* gobii-different-ios.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 62B2E90F2DFBA1E800B9A87B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				622009D32E0238D100DF2F3F /* XCRemoteSwiftPackageReference "gobii-api-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 62B2E9192DFBA1E800B9A87B /* Products */;
 			projectDirPath = "";
@@ -330,6 +339,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		622009D32E0238D100DF2F3F /* XCRemoteSwiftPackageReference "gobii-api-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/matt-greathouse/gobii-api-swift.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		622009D42E0238D100DF2F3F /* gobii-client-swift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 622009D32E0238D100DF2F3F /* XCRemoteSwiftPackageReference "gobii-api-swift" */;
+			productName = "gobii-client-swift";
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 62B2E9102DFBA1E800B9A87B /* Project object */;
 }
