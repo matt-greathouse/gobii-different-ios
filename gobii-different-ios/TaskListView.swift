@@ -51,12 +51,14 @@ class TaskListViewModel: ObservableObject {
                 return
             }
             
+            var currentResult = task
+            currentResult.detail.status = .pending
+            updateTask(currentResult)
+            
             let client = GobiiApiClient(debugMode: true)
             client.setApiKey(apiKey)
             // Start running the task
             let runResult = try await client.runTask(task.detail)
-
-            var currentResult = task
 
             if let index = self.tasks.firstIndex(where: { $0.id == task.id }) {
                 self.tasks[index].id = runResult.id ?? ""
@@ -65,30 +67,38 @@ class TaskListViewModel: ObservableObject {
             }
             
             // Poll for status updates every 5 seconds until completed
-            while true {
+            statusCheck: while true {
                 // Wait 5 seconds
                 try await Task.sleep(nanoseconds: 5 * 1_000_000_000)
 
                 // Fetch updated task status
                 let updatedTask = try await client.fetchTaskStatus(id: currentResult.id)
+                var updatedResult = currentResult
+                updatedResult.detail.status = updatedTask.status
 
-                // Update lastResult in local task
-                currentResult.detail = updatedTask
+                if let status = updatedTask.status {
+                    switch status {
+                    case .completed:
+                        updatedResult.lastResult = updatedTask.result ?? ""
+                    case .cancelled:
+                        updatedResult.lastResult = "Cancelled"
+                    case .failed:
+                        updatedResult.lastResult = "Failed"
+                    default:
+                        break
+                    }
 
-                // Update task in tasks list
-                DispatchQueue.main.async {
-                    if let index = self.tasks.firstIndex(where: { $0.id == currentResult.id }) {
-                        self.tasks[index].lastResult = currentResult.lastResult
-                        self.saveTasks()
+                    await MainActor.run {
+                        self.updateTask(updatedResult)
+                    }
+
+                    if status == .failed ||
+                        status == .completed ||
+                        status == .cancelled {
+                        break statusCheck
                     }
                 }
-
-                // Check if task is done (based on lastResult or a hypothetical isRunning flag)
-                // Here we assume lastResult contains status info or empty means running
-                if let status = updatedTask.status, status.rawValue.lowercased().contains("completed") {
-                    currentResult.lastResult = updatedTask.result ?? ""
-                    break
-                }
+                currentResult = updatedResult
             }
 
         } catch {
@@ -108,7 +118,7 @@ struct TaskRowView: View {
                 Text(task.name)
                     .font(.headline)
                 Spacer()
-                if task.detail.status == StatusEnum.in_progress {
+                if (task.detail.status == .in_progress || task.detail.status == .pending) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
                 } else {
