@@ -9,6 +9,7 @@ import gobii_client_swift
 @MainActor
 class TaskListViewModel: ObservableObject {
     @Published var tasks: [GobiiTask] = []
+    @Published private var checkingTaskIDs: Set<String> = []
 
     private let storageManager = iCloudStorageManager.shared
     private var cancellables = Set<AnyCancellable>()
@@ -21,6 +22,23 @@ class TaskListViewModel: ObservableObject {
                 self?.loadTasks()
             }
             .store(in: &cancellables)
+    }
+    
+    func checkAllTasks() {
+        guard let apiKey = iCloudStorageManager.shared.loadApiKey(), !apiKey.isEmpty else {
+            print("Missing API key")
+            return
+        }
+        let client = GobiiApiClient(debugMode: true)
+        client.setApiKey(apiKey)
+        
+        for task in self.tasks {
+            if task.detail.status == .in_progress || task.detail.status == .pending {
+                Task {
+                    await self.checkStatusWorker(client: client, task: task)
+                }
+            }
+        }
     }
 
     func loadTasks() {
@@ -66,16 +84,31 @@ class TaskListViewModel: ObservableObject {
                 currentResult.id = runResult.id ?? ""
             }
             
+            await checkStatusWorker(client: client, task: currentResult)
+        } catch {
+            // Notify UI or log error - this example does not have error UI in ViewModel
+            print("Error running task: \(error)")
+        }
+    }
+    
+    func checkStatusWorker(client: GobiiApiClient, task: GobiiTask) async {
+        let alreadyChecking = await MainActor.run { checkingTaskIDs.contains(task.id) }
+        if alreadyChecking { return }
+        await MainActor.run { checkingTaskIDs.insert(task.id) }
+        defer { Task { await MainActor.run { checkingTaskIDs.remove(task.id) } } }
+        
+        do {
+            var currentResult = task
             // Poll for status updates every 5 seconds until completed
             statusCheck: while true {
                 // Wait 5 seconds
                 try await Task.sleep(nanoseconds: 5 * 1_000_000_000)
-
+                
                 // Fetch updated task status
                 let updatedTask = try await client.fetchTaskStatus(id: currentResult.id)
                 var updatedResult = currentResult
                 updatedResult.detail.status = updatedTask.status
-
+                
                 if let status = updatedTask.status {
                     switch status {
                     case .completed:
@@ -87,11 +120,11 @@ class TaskListViewModel: ObservableObject {
                     default:
                         break
                     }
-
+                    
                     await MainActor.run {
                         self.updateTask(updatedResult)
                     }
-
+                    
                     if status == .failed ||
                         status == .completed ||
                         status == .cancelled {
@@ -100,9 +133,8 @@ class TaskListViewModel: ObservableObject {
                 }
                 currentResult = updatedResult
             }
-
-        } catch {
-            // Notify UI or log error - this example does not have error UI in ViewModel
+        }
+        catch {
             print("Error running task: \(error)")
         }
     }
@@ -195,6 +227,9 @@ struct TaskListView: View {
                     showingNewTaskEditor = false
                 })
             }
+        }
+        .onAppear {
+            viewModel.checkAllTasks()
         }
     }
 }
