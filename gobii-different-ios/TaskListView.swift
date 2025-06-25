@@ -25,16 +25,17 @@ class TaskListViewModel: ObservableObject {
     }
     
     func checkAllTasks() {
-        guard let apiKey = iCloudStorageManager.shared.loadApiKey(), !apiKey.isEmpty else {
-            print("Missing API key")
-            return
-        }
-        let client = GobiiApiClient(debugMode: true)
-        client.setApiKey(apiKey)
-        
-        for task in self.tasks {
-            if task.detail.status == .in_progress || task.detail.status == .pending {
-                Task {
+        Task {
+            guard let apiKey = iCloudStorageManager.shared.loadApiKey(), !apiKey.isEmpty else {
+                print("Missing API key")
+                return
+            }
+            
+            let client = GobiiApiClient(debugMode: true)
+            await client.setApiKey(apiKey)
+            
+            for task in self.tasks {
+                if task.detail.status == .in_progress || task.detail.status == .pending {
                     await self.checkStatusWorker(client: client, task: task)
                 }
             }
@@ -74,7 +75,7 @@ class TaskListViewModel: ObservableObject {
             updateTask(currentResult)
             
             let client = GobiiApiClient(debugMode: true)
-            client.setApiKey(apiKey)
+            await client.setApiKey(apiKey)
             // Start running the task
             let runResult = try await client.runTask(task.detail)
 

@@ -2,7 +2,6 @@ import Foundation
 import AppIntents
 import gobii_client_swift
 
-// Define the intent that runs a GobiiTask with a prompt input and returns the lastResult output
 struct GobiiTaskIntent: AppIntent {
     static var title: LocalizedStringResource = "Run Gobii Task"
     
@@ -24,11 +23,15 @@ struct GobiiTaskIntent: AppIntent {
         
         // Load API key
         guard let apiKey = iCloudStorageManager.shared.loadApiKey(), !apiKey.isEmpty else {
-            throw NSError(domain: "GobiiTaskIntent", code: 1, userInfo: [NSLocalizedDescriptionKey: "Missing API Key"])
+            throw NSError(
+                domain: "GobiiTaskIntent",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "API key is missing. Please configure your API key in the app settings."]
+            )
         }
         
         let client = GobiiApiClient(debugMode: true)
-        client.setApiKey(apiKey)
+        await client.setApiKey(apiKey)
         
         // Run the task using the GobiiApiClient
         let runResult = try await client.runTask(taskDetail)
