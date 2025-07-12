@@ -16,7 +16,7 @@ struct GobiiTaskIntent: AppIntent {
         var description: String { lastResult }
     }
     
-    // Perform method runs the task asynchronously and returns the lastResult
+    // Perform method creates the task and returns its ID without polling
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
         // Create a TaskDetail with given prompt
         let taskDetail = TaskDetail(id: UUID().uuidString, prompt: prompt, outputSchema: nil)
@@ -36,30 +36,11 @@ struct GobiiTaskIntent: AppIntent {
         // Run the task using the GobiiApiClient
         let runResult = try await client.runTask(taskDetail)
         
-        // Poll for status until completion or failure
-        var finalResult = ""
-        var status = runResult.status
-        var currentTask = runResult
+        let taskId = runResult.id ?? "Unknown ID"
         
-        while status == .pending || status == .in_progress {
-            try await Task.sleep(nanoseconds: 2 * 1_000_000_000) // 2 seconds delay
-            currentTask = try await client.fetchTaskStatus(id: currentTask.id ?? "")
-            status = currentTask.status
-        }
+        let dialog = IntentDialog(full: "Task created with ID: \(taskId)",
+                                  supporting: "Task ID: \(taskId)")
         
-        if status == .completed {
-            finalResult = currentTask.result ?? ""
-        } else if status == .failed {
-            finalResult = "Failed"
-        } else if status == .cancelled {
-            finalResult = "Cancelled"
-        } else {
-            finalResult = "Unknown status"
-        }
-        
-        let dialog = IntentDialog(full: "Result: \(finalResult)",
-                                  supporting: "\(finalResult)")
-        
-        return .result(value: finalResult, dialog: dialog)
+        return .result(value: taskId, dialog: dialog)
     }
 }
